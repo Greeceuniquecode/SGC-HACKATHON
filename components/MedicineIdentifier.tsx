@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
-import { Camera, Upload, Loader2, AlertCircle } from 'lucide-react';
+import { Camera, Upload, Loader2, AlertCircle, Plus, Trash2, FileText, Pill } from 'lucide-react';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 
 interface MedicineIdentifierProps {
   language: 'en' | 'ne';
@@ -21,10 +27,44 @@ interface MedicineInfo {
   photo: string;
 }
 
+interface PrescriptionMedicine {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+}
+
+interface Prescription {
+  doctorName: string;
+  date: string;
+  patientName: string;
+  medicines: PrescriptionMedicine[];
+}
+
+interface PrescriptionAnalysis {
+  interactions: string[];
+  interactionsNe: string[];
+  recommendations: string[];
+  recommendationsNe: string[];
+  riskLevel: 'low' | 'medium' | 'high';
+  overallAssessment: string;
+  overallAssessmentNe: string;
+}
+
 export function MedicineIdentifier({ language }: MedicineIdentifierProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<MedicineInfo | null>(null);
+
+  // Prescription state
+  const [prescription, setPrescription] = useState<Prescription>({
+    doctorName: '',
+    date: '',
+    patientName: '',
+    medicines: []
+  });
+  const [prescriptionLoading, setPrescriptionLoading] = useState(false);
+  const [prescriptionAnalysis, setPrescriptionAnalysis] = useState<PrescriptionAnalysis | null>(null);
 
   const translations = {
     en: {
@@ -40,7 +80,30 @@ export function MedicineIdentifier({ language }: MedicineIdentifierProps) {
       sideEffects: 'Side Effects',
       warnings: 'Warnings',
       disclaimer: 'AI-generated information. Always consult a healthcare professional or pharmacist.',
-      noImage: 'Please upload or take a picture of the medicine'
+      noImage: 'Please upload or take a picture of the medicine',
+      // Prescription translations
+      prescriptionTab: 'Prescription Analysis',
+      singleMedicineTab: 'Single Medicine',
+      prescriptionTitle: 'Prescription Analysis',
+      prescriptionSubtitle: 'Enter your prescription details for AI-powered analysis',
+      doctorName: 'Doctor Name',
+      prescriptionDate: 'Date',
+      patientName: 'Patient Name',
+      addMedicine: 'Add Medicine',
+      medicineNameLabel: 'Medicine Name',
+      dosageLabel: 'Dosage',
+      frequencyLabel: 'Frequency',
+      durationLabel: 'Duration',
+      analyzePrescription: 'Analyze Prescription',
+      analyzingPrescription: 'Analyzing prescription...',
+      interactions: 'Potential Interactions',
+      recommendations: 'Recommendations',
+      riskLevel: 'Risk Level',
+      overallAssessment: 'Overall Assessment',
+      lowRisk: 'Low Risk',
+      mediumRisk: 'Medium Risk',
+      highRisk: 'High Risk',
+      removeMedicine: 'Remove'
     },
     ne: {
       title: 'एआई औषधि पहिचानकर्ता',
@@ -55,11 +118,68 @@ export function MedicineIdentifier({ language }: MedicineIdentifierProps) {
       sideEffects: 'साइड इफेक्टहरू',
       warnings: 'चेतावनीहरू',
       disclaimer: 'एआई-उत्पन्न जानकारी। सधैं स्वास्थ्य सेवा पेशेवर वा फार्मासिस्टसँग परामर्श गर्नुहोस्।',
-      noImage: 'कृपया औषधिको तस्वीर अपलोड गर्नुहोस् वा खिच्नुहोस्'
+      noImage: 'कृपया औषधिको तस्वीर अपलोड गर्नुहोस् वा खिच्नुहोस्',
+      // Prescription translations
+      prescriptionTab: 'प्रेस्क्रिप्शन विश्लेषण',
+      singleMedicineTab: 'एकल औषधि',
+      prescriptionTitle: 'प्रेस्क्रिप्शन विश्लेषण',
+      prescriptionSubtitle: 'एआई-संचालित विश्लेषणका लागि आफ्नो प्रेस्क्रिप्शन विवरणहरू प्रविष्ट गर्नुहोस्',
+      doctorName: 'डाक्टरको नाम',
+      prescriptionDate: 'मिति',
+      patientName: 'बिरामीको नाम',
+      addMedicine: 'औषधि थप्नुहोस्',
+      medicineNameLabel: 'औषधिको नाम',
+      dosageLabel: 'खुराक',
+      frequencyLabel: 'आवृत्ति',
+      durationLabel: 'अवधि',
+      analyzePrescription: 'प्रेस्क्रिप्शन विश्लेषण गर्नुहोस्',
+      analyzingPrescription: 'प्रेस्क्रिप्शन विश्लेषण गर्दै...',
+      interactions: 'सम्भावित अन्तरक्रियाहरू',
+      recommendations: 'सिफारिशहरू',
+      riskLevel: 'जोखिम स्तर',
+      overallAssessment: 'समग्र मूल्यांकन',
+      lowRisk: 'कम जोखिम',
+      mediumRisk: 'मध्यम जोखिम',
+      highRisk: 'उच्च जोखिम',
+      removeMedicine: 'हटाउनुहोस्'
     }
   };
 
   const t = translations[language];
+
+  // Prescription management functions
+  const addMedicineToPrescription = () => {
+    setPrescription(prev => ({
+      ...prev,
+      medicines: [...prev.medicines, { name: '', dosage: '', frequency: '', duration: '' }]
+    }));
+  };
+
+  const updateMedicine = (index: number, field: keyof PrescriptionMedicine, value: string) => {
+    setPrescription(prev => ({
+      ...prev,
+      medicines: prev.medicines.map((med, i) => i === index ? { ...med, [field]: value } : med)
+    }));
+  };
+
+  const removeMedicine = (index: number) => {
+    setPrescription(prev => ({
+      ...prev,
+      medicines: prev.medicines.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleAnalyzePrescription = async () => {
+    setPrescriptionLoading(true);
+    try {
+      const analysis = await analyzePrescriptionWithAI(prescription);
+      setPrescriptionAnalysis(analysis);
+    } catch (error) {
+      console.error('Error analyzing prescription:', error);
+    } finally {
+      setPrescriptionLoading(false);
+    }
+  };
 
   // Mock medicine database with multiple medicines
   const mockMedicineDatabase: MedicineInfo[] = [
@@ -299,6 +419,85 @@ export function MedicineIdentifier({ language }: MedicineIdentifierProps) {
     return mockMedicineDatabase[randomIndex];
   };
 
+  // Mock AI prescription analysis
+  const analyzePrescriptionWithAI = async (prescriptionData: Prescription): Promise<PrescriptionAnalysis> => {
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Mock analysis based on medicine combinations
+    const medicineNames = prescriptionData.medicines.map(m => m.name.toLowerCase());
+
+    let interactions: string[] = [];
+    let interactionsNe: string[] = [];
+    let recommendations: string[] = [];
+    let recommendationsNe: string[] = [];
+    let riskLevel: 'low' | 'medium' | 'high' = 'low';
+    let overallAssessment = '';
+    let overallAssessmentNe = '';
+
+    // Check for common interactions
+    if (medicineNames.includes('ibuprofen') && medicineNames.includes('aspirin')) {
+      interactions = ['Increased risk of stomach bleeding when combining NSAIDs'];
+      interactionsNe = ['NSAIDहरू संयोजन गर्दा पेट रक्तस्रावको जोखिम बढ्छ'];
+      riskLevel = 'high';
+    } else if (medicineNames.includes('paracetamol') && medicineNames.includes('ibuprofen')) {
+      interactions = ['Generally safe combination, but monitor for side effects'];
+      interactionsNe = ['सामान्यतया सुरक्षित संयोजन, तर साइड इफेक्टहरूका लागि निगरानी गर्नुहोस्'];
+      riskLevel = 'low';
+    } else if (medicineNames.includes('omeprazole') && medicineNames.includes('amoxicillin')) {
+      interactions = ['Common antibiotic combination, generally safe'];
+      interactionsNe = ['सामान्य एन्टिबायोटिक संयोजन, सामान्यतया सुरक्षित'];
+      riskLevel = 'low';
+    }
+
+    // Generate recommendations
+    if (prescriptionData.medicines.length > 3) {
+      recommendations = [
+        'Consider spacing out medication times to reduce stomach irritation',
+        'Monitor for any unusual symptoms and consult doctor if needed',
+        'Ensure adequate hydration while taking multiple medications'
+      ];
+      recommendationsNe = [
+        'पेट चिढिने कम गर्न औषधि समयहरू स्पेस गर्न विचार गर्नुहोस्',
+        'कुनै असामान्य लक्षणहरूका लागि निगरानी गर्नुहोस् र आवश्यक भए डाक्टरसँग परामर्श गर्नुहोस्',
+        'बहुविध औषधि लिइरहेको बेला पर्याप्त हाइड्रेसन सुनिश्चित गर्नुहोस्'
+      ];
+      riskLevel = riskLevel === 'low' ? 'medium' : riskLevel;
+    } else {
+      recommendations = [
+        'Take medications as prescribed',
+        'Report any side effects to your doctor',
+        'Complete the full course of antibiotics if prescribed'
+      ];
+      recommendationsNe = [
+        'प्रेस्क्राइब गरिए अनुसार औषधिहरू लिनुहोस्',
+        'कुनै साइड इफेक्टहरू आफ्नो डाक्टरलाई रिपोर्ट गर्नुहोस्',
+        'प्रेस्क्राइब गरिएमा एन्टिबायोटिकहरूको पूर्ण कोर्स पूरा गर्नुहोस्'
+      ];
+    }
+
+    // Overall assessment
+    if (riskLevel === 'high') {
+      overallAssessment = 'High risk prescription. Consult your doctor before starting this combination.';
+      overallAssessmentNe = 'उच्च जोखिम प्रेस्क्रिप्शन। यो संयोजन सुरु गर्नु अघि आफ्नो डाक्टरसँग परामर्श गर्नुहोस्।';
+    } else if (riskLevel === 'medium') {
+      overallAssessment = 'Moderate risk prescription. Monitor for side effects and consult doctor if needed.';
+      overallAssessmentNe = 'मध्यम जोखिम प्रेस्क्रिप्शन। साइड इफेक्टहरूका लागि निगरानी गर्नुहोस् र आवश्यक भए डाक्टरसँग परामर्श गर्नुहोस्।';
+    } else {
+      overallAssessment = 'Low risk prescription. Generally safe combination.';
+      overallAssessmentNe = 'कम जोखिम प्रेस्क्रिप्शन। सामान्यतया सुरक्षित संयोजन।';
+    }
+
+    return {
+      interactions,
+      interactionsNe,
+      recommendations,
+      recommendationsNe,
+      riskLevel,
+      overallAssessment,
+      overallAssessmentNe
+    };
+  };
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -307,7 +506,7 @@ export function MedicineIdentifier({ language }: MedicineIdentifierProps) {
     reader.onloadend = async () => {
       const imageData = reader.result as string;
       setSelectedImage(imageData);
-      
+
       setLoading(true);
       try {
         const info = await identifyMedicineWithAI(imageData);
@@ -328,125 +527,327 @@ export function MedicineIdentifier({ language }: MedicineIdentifierProps) {
         <p className="text-gray-600">{t.subtitle}</p>
       </div>
 
-      <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
-        <div className="grid md:grid-cols-2 gap-4">
-          <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
-            <Upload className="w-12 h-12 text-gray-400 mb-3" />
-            <span className="text-gray-600 font-medium">{t.upload}</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-          </label>
+      <Tabs defaultValue="single" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="single">{t.singleMedicineTab}</TabsTrigger>
+          <TabsTrigger value="prescription">{t.prescriptionTab}</TabsTrigger>
+        </TabsList>
 
-          <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
-            <Camera className="w-12 h-12 text-gray-400 mb-3" />
-            <span className="text-gray-600 font-medium">{t.takePicture}</span>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleImageUpload}
-              className="hidden"
-            />
-          </label>
-        </div>
+        <TabsContent value="single" className="space-y-6">
+          <div className="bg-white rounded-xl shadow-lg p-6 space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+                <Upload className="w-12 h-12 text-gray-400 mb-3" />
+                <span className="text-gray-600 font-medium">{t.upload}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+              </label>
 
-        {selectedImage && (
-          <div className="mt-4">
-            <img
-              src={selectedImage}
-              alt="Selected medicine"
-              className="w-full max-h-64 object-contain rounded-lg"
-            />
-          </div>
-        )}
+              <label className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all">
+                <Camera className="w-12 h-12 text-gray-400 mb-3" />
+                <span className="text-gray-600 font-medium">{t.takePicture}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleImageUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
 
-        {loading && (
-          <div className="flex items-center justify-center gap-2 p-4">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-            <span className="text-gray-700">{t.analyzing}</span>
-          </div>
-        )}
-
-        <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-yellow-800">{t.disclaimer}</p>
-        </div>
-      </div>
-
-      {result && !loading && (
-        <div className="bg-white rounded-xl shadow-lg p-6 space-y-6">
-          <div className="pb-4 border-b border-gray-200">
-            <div className="flex items-center gap-4 mb-4">
-              <img
-                src={result.photo}
-                alt={language === 'en' ? result.name : result.nameNe}
-                className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-              />
-              <div>
-                <h3 className="text-2xl font-bold text-gray-900">
-                  {language === 'en' ? result.name : result.nameNe}
-                </h3>
-                <p className="text-gray-600 mt-1">
-                  {t.genericName}: {language === 'en' ? result.genericName : result.genericNameNe}
-                </p>
+            {selectedImage && (
+              <div className="mt-4">
+                <img
+                  src={selectedImage}
+                  alt="Selected medicine"
+                  className="w-full max-h-64 object-contain rounded-lg"
+                />
               </div>
+            )}
+
+            {loading && (
+              <div className="flex items-center justify-center gap-2 p-4">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                <span className="text-gray-700">{t.analyzing}</span>
+              </div>
+            )}
+
+            <div className="flex items-start gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-yellow-800">{t.disclaimer}</p>
             </div>
           </div>
 
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="text-2xl">💊</span> {t.uses}
-            </h4>
-            <ul className="space-y-2">
-              {(language === 'en' ? result.uses : result.usesNe).map((use, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="text-blue-600 mt-1">•</span>
-                  <span className="text-gray-700">{use}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {result && !loading && (
+            <div className="bg-white rounded-xl shadow-lg p-6 space-y-6">
+              <div className="pb-4 border-b border-gray-200">
+                <div className="flex items-center gap-4 mb-4">
+                  <img
+                    src={result.photo}
+                    alt={language === 'en' ? result.name : result.nameNe}
+                    className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                  />
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-900">
+                      {language === 'en' ? result.name : result.nameNe}
+                    </h3>
+                    <p className="text-gray-600 mt-1">
+                      {t.genericName}: {language === 'en' ? result.genericName : result.genericNameNe}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-          <div className="p-4 bg-blue-50 rounded-lg">
-            <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
-              <span className="text-2xl">📋</span> {t.dosage}
-            </h4>
-            <p className="text-gray-700">{language === 'en' ? result.dosage : result.dosageNe}</p>
-          </div>
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="text-2xl">💊</span> {t.uses}
+                </h4>
+                <ul className="space-y-2">
+                  {(language === 'en' ? result.uses : result.usesNe).map((use, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-blue-600 mt-1">•</span>
+                      <span className="text-gray-700">{use}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-          <div>
-            <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <span className="text-2xl">⚠️</span> {t.sideEffects}
-            </h4>
-            <ul className="space-y-2">
-              {(language === 'en' ? result.sideEffects : result.sideEffectsNe).map((effect, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="text-orange-600 mt-1">•</span>
-                  <span className="text-gray-700">{effect}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <h4 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                  <span className="text-2xl">📋</span> {t.dosage}
+                </h4>
+                <p className="text-gray-700">{language === 'en' ? result.dosage : result.dosageNe}</p>
+              </div>
 
-          <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-            <h4 className="font-semibold text-red-900 mb-3 flex items-center gap-2">
-              <span className="text-2xl">🚨</span> {t.warnings}
-            </h4>
-            <ul className="space-y-2">
-              {(language === 'en' ? result.warnings : result.warningsNe).map((warning, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="text-red-600 mt-1">•</span>
-                  <span className="text-red-900">{warning}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <span className="text-2xl">⚠️</span> {t.sideEffects}
+                </h4>
+                <ul className="space-y-2">
+                  {(language === 'en' ? result.sideEffects : result.sideEffectsNe).map((effect, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-orange-600 mt-1">•</span>
+                      <span className="text-gray-700">{effect}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                <h4 className="font-semibold text-red-900 mb-3 flex items-center gap-2">
+                  <span className="text-2xl">🚨</span> {t.warnings}
+                </h4>
+                <ul className="space-y-2">
+                  {(language === 'en' ? result.warnings : result.warningsNe).map((warning, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <span className="text-red-600 mt-1">•</span>
+                      <span className="text-red-900">{warning}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="prescription" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-6 h-6" />
+                {t.prescriptionTitle}
+              </CardTitle>
+              <CardDescription>{t.prescriptionSubtitle}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="doctorName">{t.doctorName}</Label>
+                  <Input
+                    id="doctorName"
+                    value={prescription.doctorName}
+                    onChange={(e) => setPrescription(prev => ({ ...prev, doctorName: e.target.value }))}
+                    placeholder="Dr. Smith"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="date">{t.prescriptionDate}</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={prescription.date}
+                    onChange={(e) => setPrescription(prev => ({ ...prev, date: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="patientName">{t.patientName}</Label>
+                  <Input
+                    id="patientName"
+                    value={prescription.patientName}
+                    onChange={(e) => setPrescription(prev => ({ ...prev, patientName: e.target.value }))}
+                    placeholder="John Doe"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-lg font-semibold flex items-center gap-2">
+                    <Pill className="w-5 h-5" />
+                    Medicines
+                  </h4>
+                  <Button onClick={addMedicineToPrescription} variant="outline" size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    {t.addMedicine}
+                  </Button>
+                </div>
+
+                {prescription.medicines.map((medicine, index) => (
+                  <Card key={index} className="p-4">
+                    <div className="grid md:grid-cols-5 gap-4 items-end">
+                      <div className="space-y-2">
+                        <Label>{t.medicineNameLabel}</Label>
+                        <Input
+                          value={medicine.name}
+                          onChange={(e) => updateMedicine(index, 'name', e.target.value)}
+                          placeholder="Paracetamol 500mg"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t.dosageLabel}</Label>
+                        <Input
+                          value={medicine.dosage}
+                          onChange={(e) => updateMedicine(index, 'dosage', e.target.value)}
+                          placeholder="1 tablet"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t.frequencyLabel}</Label>
+                        <Input
+                          value={medicine.frequency}
+                          onChange={(e) => updateMedicine(index, 'frequency', e.target.value)}
+                          placeholder="3 times daily"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t.durationLabel}</Label>
+                        <Input
+                          value={medicine.duration}
+                          onChange={(e) => updateMedicine(index, 'duration', e.target.value)}
+                          placeholder="7 days"
+                        />
+                      </div>
+                      <Button
+                        onClick={() => removeMedicine(index)}
+                        variant="destructive"
+                        size="sm"
+                        className="mb-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+
+              <Button
+                onClick={handleAnalyzePrescription}
+                disabled={prescription.medicines.length === 0 || prescription.medicines.some(m => !m.name.trim()) || prescriptionLoading}
+                className="w-full"
+              >
+                {prescriptionLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {t.analyzingPrescription}
+                  </>
+                ) : (
+                  t.analyzePrescription
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          {prescriptionAnalysis && !prescriptionLoading && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertCircle className="w-6 h-6" />
+                    {t.overallAssessment}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className={`p-4 rounded-lg border-2 ${
+                    prescriptionAnalysis.riskLevel === 'high' ? 'bg-red-50 border-red-200' :
+                    prescriptionAnalysis.riskLevel === 'medium' ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-green-50 border-green-200'
+                  }`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`px-2 py-1 rounded text-sm font-medium ${
+                        prescriptionAnalysis.riskLevel === 'high' ? 'bg-red-100 text-red-800' :
+                        prescriptionAnalysis.riskLevel === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
+                      }`}>
+                        {prescriptionAnalysis.riskLevel === 'high' ? t.highRisk :
+                         prescriptionAnalysis.riskLevel === 'medium' ? t.mediumRisk :
+                         t.lowRisk}
+                      </span>
+                    </div>
+                    <p className="text-gray-700">
+                      {language === 'en' ? prescriptionAnalysis.overallAssessment : prescriptionAnalysis.overallAssessmentNe}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {prescriptionAnalysis.interactions.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <span className="text-2xl">⚠️</span>
+                      {t.interactions}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ul className="space-y-2">
+                      {(language === 'en' ? prescriptionAnalysis.interactions : prescriptionAnalysis.interactionsNe).map((interaction, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="text-orange-600 mt-1">•</span>
+                          <span className="text-gray-700">{interaction}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <span className="text-2xl">💡</span>
+                    {t.recommendations}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {(language === 'en' ? prescriptionAnalysis.recommendations : prescriptionAnalysis.recommendationsNe).map((recommendation, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-blue-600 mt-1">•</span>
+                        <span className="text-gray-700">{recommendation}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

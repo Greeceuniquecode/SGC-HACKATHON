@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LoginPage } from './components/LoginPage';
 import { Dashboard } from './components/Dashboard';
+import { Toaster, toast } from 'sonner';
 
 export interface User {
   id: string;
@@ -14,10 +15,12 @@ function App() {
 
   const handleLogin = (userData: User) => {
     setUser(userData);
+    toast.success('Logged in', { style: { background: 'green', color: 'white' } });
   };
 
   const handleLogout = () => {
     setUser(null);
+    toast.error('Logged out', { style: { background: 'red', color: 'white' } });
   };
 
   return (
@@ -27,6 +30,7 @@ function App() {
       ) : (
         <Dashboard user={user} onLogout={handleLogout} />
       )}
+      <Toaster position="top-right" />
     </div>
   );
 }
